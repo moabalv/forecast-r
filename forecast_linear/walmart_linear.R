@@ -26,10 +26,18 @@ ggseasonplot(ts_loja) +
   xlab("Semana") + 
   ylab("Vendas")
 
+
 autoplot(forecast(ts_loja))
 
 fit_loja1 <- tslm(ts_loja ~ season + trend)
 fc_linear <- forecast(fit_loja1, h = 104)
 autoplot(fc_linear)
 
+fit_loja1 <- tslm(ts_loja ~ season)
+fc_linear <- forecast(fit_loja1, h = 104)
+autoplot(fc_linear)
+
+fit_loja1 <- tslm(ts_loja ~ trend)
+fc_linear <- forecast(fit_loja1, h = 104)
+autoplot(fc_linear)
 
