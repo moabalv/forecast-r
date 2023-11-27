@@ -1,6 +1,8 @@
-library("dplyr", "ggplot2", "forecast", "tidyr")
-data <- read.csv("C:/Users/moaba/OneDrive/Documentos/forecast-r/walmart-sales-dataset-of-45stores.csv")
+library(tidyverse)
+library(forecast)
 
+
+data <- read.csv("https://raw.githubusercontent.com/moabalv/analise-dados/main/walmart-sales-dataset-of-45stores.csv")
 names(data)
 
 lojas <- data %>%
