@@ -16,7 +16,7 @@ library(forecast)
 ## Leitura dos Dados
 
 ```{r leitura dos dados}
-data <- read.csv("https://raw.githubusercontent.com/moabalv/analise-dados/main/walmart-sales-dataset-of-45stores.csv")
+data <- read_csv("https://raw.githubusercontent.com/moabalv/analise-dados/main/walmart-sales-dataset-of-45stores.csv")
 
 names(data)
 ```
@@ -29,7 +29,7 @@ Os dados têm informações das vendas semanais de 45 lojas do walmart ao longo 
 lojas <- data %>%
   select(Store, Weekly_Sales, Date) %>%
   rename(store = Store, weekly_sales = Weekly_Sales, date = Date) %>%
-  group_by(store)
+  mutate(date = as.POSIXct(date, format = "%d-%m-%Y"))
 ```
 
 ## Criando a série temporal
@@ -37,16 +37,19 @@ lojas <- data %>%
 Os dados estão organizados semanalmente, a partir da 5ª semana de 2010 até a 43ª semana de 2012. Segue o gráfico com a série temporal das vendas da loja 1.
 
 ```{r}
-ts_loja <- lojas %>%
+loja_1 <- lojas %>%
   filter(store == 1) %>%
-  ungroup() %>%
+  select(date, weekly_sales)
+
+ts_loja <- loja_1 %>%
   select(weekly_sales) %>%
   ts(frequency = 52, start = c(2010,5), end = c(2012,43))
 
-autoplot(ts_loja) +
-  ggtitle("Walmart: vendas da loja 1") +
-  xlab("Ano") +
-  ylab("Vendas")
+ggplot(ts_loja) +
+  geom_line(mapping = aes(y = ts_loja[], x = loja_1$date)) +
+  scale_x_datetime(name = "Ano e mês", date_labels = "%Y-%m", date_breaks = "3 month") + 
+  scale_y_continuous(name = "Vendas") +
+  theme_bw()
 ```
 
 ### Sazonalidade
@@ -59,35 +62,53 @@ ggseasonplot(ts_loja) +
   xlab("Semana") + 
   ylab("Vendas")
 ```
+```{r}
+plot(decompose(ts_loja))
+```
 
 ## Forecast
+Para o forecast, foi separado cerca de 80% dos dados (115 observações) para o treinamento dos modelos. Enquanto os outros 20% dos dados (28 observações) foram reservados para os testes.
+```{r}
+ts_loja.train = window(ts_loja, end = time(ts_loja)[115])
+ts_loja.test = window(ts_loja, start= time(ts_loja)[116])
 
-```{r, fig.width=9, fig.height = 5}
-autoplot(forecast(ts_loja))
 ```
+Primeiramente, foi realizado o forecast utilizando a série temporal, neste caso a função forecast fez uso de um modelo ETS.
+```{r}
 
-### Usando o modelo de regressão linear
+fc <- forecast(ts_loja.train, h = 28)
 
-Passando a sazonalidade dos dados e a tendência como regressores obtemos a seguinte predição:
 
-```{r, fig.width=9, fig.height = 5}
-fit_loja1 <- tslm(ts_loja ~ season + trend)
-fc_linear <- forecast(fit_loja1, h = 104)
-autoplot(fc_linear)
+accuracy(fc, ts_loja.test)
+
+
+autoplot(fc, include = 10) +
+  autolayer(ts_loja.test, series = "Observado")
 ```
+Observa-se que em alguns pontos, o valor observado chega a ficar de fora do intervalo de predição. 
+Aqui o valor do RMSE foi de 55701. 
 
-Enquanto se desconsiderarmos esses fatores, teríamos que:
+## Usando o modelo de regressão linear
+
+
+Posteriormente, foi utilizado um modelo de regressão linear, utilizando a sazonlidade e a tendência da série como regressores.:
 
 ```{r}
-fit_loja1 <- tslm(ts_loja ~ season)
-fc_linear <- forecast(fit_loja1, h = 104)
-autoplot(fc_linear) +
-  ggtitle("Predição apenas com a sazonalidade dos dados")
+fit_loja1 <- tslm(ts_loja.train ~ season + trend)
+fc_linear <- forecast(fit_loja1, h = 28)
+accuracy(fc_linear, ts_loja.test)
+```
+Nesse caso os valores de erro obtidos são menores que o do modelo anterior, sendo o RMSE aqui de 51547.
 
-fit_loja1 <- tslm(ts_loja ~ trend)
-fc_linear <- forecast(fit_loja1, h = 104)
-autoplot(fc_linear) + 
-  ggtitle("Predição apenas com a tendência dos dados")
+Ao comparar os valores previstos pelo modelo com os valores observados, temos que:
+
+```{r}
+autoplot(fc_linear, include = 10, series = "Previsto") +
+  autolayer(ts_loja.test, series = "Observado") +
+  labs(y = "Vendas", x = "Ano") +
+  scale_color_manual(values = c("Observado" = "red"))
+
+
+checkresiduals(fit_loja1)
 ```
 
-Em ambos os casos o intervalo de predição tem um aumento.
